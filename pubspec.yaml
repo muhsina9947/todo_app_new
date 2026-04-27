@@ -30,31 +30,17 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-     # Firebase Core
-  firebase_core: ^4.6.0
-  firebase_core_platform_interface: ^6.0.3
-  firebase_core_web: ^3.5.1
-
-  # Firebase Auth
-  firebase_auth: ^6.3.0
-  firebase_auth_platform_interface: ^8.1.8
-  firebase_auth_web: ^6.1.4
-
-
-  # Firestore
-  cloud_firestore: ^6.2.0
-  cloud_firestore_platform_interface: ^7.1.0
-  cloud_firestore_web: ^5.2.0
-
-  # Other useful packages
-  http_parser: ^4.1.2
-  js: ^0.7.2
+  firebase_core: ^4.7.0
+  firebase_auth: ^6.4.0
+  cloud_firestore: ^6.3.0
+  firebase_storage: any
+  image_picker: any
   intl: ^0.18.0
-  # Add any others you use, like google_sign_in
-
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
+  firebase_messaging: any
+  flutter_local_notifications: ^17.0.0
+  google_sign_in: ^6.1.5
+  
+  
 
 dev_dependencies:
   flutter_test:

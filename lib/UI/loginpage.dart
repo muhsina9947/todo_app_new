@@ -1,14 +1,8 @@
-// import 'package:api_text4/UI/signup.dart';
-// import 'package:api_text4/UI/phoneloginpage.dart';
-// import 'package:api_text4/UI/signuppage.dart';
-// import 'package:api_text4/UI/translatorscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-// import 'package:todo_app/UI/signuppage.dart';
-// import 'package:todo_app/UI/todolist.dart';
+import 'package:google_sign_in/google_sign_in.dart'; 
 import 'package:todo_app_new/UI/signuppage.dart';
 import 'package:todo_app_new/UI/todolist.dart';
-// import 'package:google_sign_in/google_sign_in.dart';
 
 class Loginpage extends StatefulWidget {
   const Loginpage({super.key});
@@ -24,11 +18,12 @@ class _LoginpageState extends State<Loginpage> {
   bool isPasswordVisible = false;
   bool isLoading = false;
 
+  
   Future<void> login() async {
     if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Fill all fields")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill all fields")),
+      );
       return;
     }
 
@@ -40,39 +35,67 @@ class _LoginpageState extends State<Loginpage> {
         password: passwordController.text.trim(),
       );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const Todolist()),
-      );
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const Todolist()),
+        );
+      }
     } on FirebaseAuthException catch (e) {
       String msg = "Login Failed";
-
       if (e.code == 'user-not-found') {
-        msg = "User not found";
+        msg = "No user found for that email.";
       } else if (e.code == 'wrong-password') {
-        msg = "Wrong password";
+        msg = "Wrong password provided.";
+      } else if (e.code == 'invalid-email') {
+        msg = "The email address is badly formatted.";
       }
-
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
-
-    setState(() => isLoading = false);
   }
 
-  Future<void> signInWithGoogle() async {
-    try {
-      GoogleAuthProvider authProvider = GoogleAuthProvider();
+ 
 
-      await FirebaseAuth.instance.signInWithPopup(authProvider);
+    final GoogleSignIn googleSignIn = GoogleSignIn();
 
+Future<void> signInWithGoogle() async {
+  setState(() => isLoading = true);
+  try {
+    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+    if (googleUser == null) {
+      setState(() => isLoading = false);
+      return;
+    }
+
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    await FirebaseAuth.instance.signInWithCredential(credential);
+
+    if (mounted) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const Todolist()),
       );
-    } catch (e) {
-      print("Error: $e");
     }
+  } catch (e) {
+    print("Google Sign-In Error: $e");
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Google Sign-In Failed")),
+    );
+  } finally {
+    if (mounted) setState(() => isLoading = false);
   }
+}
+
 
   @override
   void dispose() {
@@ -95,19 +118,16 @@ class _LoginpageState extends State<Loginpage> {
       ),
       child: Row(
         children: [
-          Icon(icon, color: Colors.black),
+          Icon(icon, color: Colors.black54),
           const SizedBox(width: 10),
           Expanded(
             child: TextField(
               controller: controller,
-              style: const TextStyle(
-                color: Colors.black,
-              ), // typing text also black
+              style: const TextStyle(color: Colors.black),
               obscureText: isPassword ? !isPasswordVisible : false,
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: const TextStyle(color: Colors.black),
-
+                hintStyle: const TextStyle(color: Colors.grey),
                 border: InputBorder.none,
               ),
             ),
@@ -116,6 +136,7 @@ class _LoginpageState extends State<Loginpage> {
             IconButton(
               icon: Icon(
                 isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                color: Colors.grey,
               ),
               onPressed: () {
                 setState(() => isPasswordVisible = !isPasswordVisible);
@@ -132,7 +153,6 @@ class _LoginpageState extends State<Loginpage> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFF36D1DC), Color(0xFF5B86E5)],
@@ -140,60 +160,48 @@ class _LoginpageState extends State<Loginpage> {
             end: Alignment.bottomRight,
           ),
         ),
-
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(25),
-
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 80),
-
+                const SizedBox(height: 60),
                 const Text(
-                  "Welcome ",
+                  "Welcome",
                   style: TextStyle(
-                    fontSize: 30,
+                    fontSize: 32,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
-
-                const SizedBox(height: 5),
-
                 const Text(
                   "Login to continue",
-                  style: TextStyle(color: Colors.white70),
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
                 ),
-
                 const SizedBox(height: 40),
-
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(25),
                   ),
-
                   child: Column(
                     children: [
                       buildTextField(
                         icon: Icons.email_outlined,
-                        hint: "Enter your email",
+                        hint: "Email",
                         controller: emailController,
                       ),
-
                       const SizedBox(height: 20),
-
                       buildTextField(
                         icon: Icons.lock_outline,
-                        hint: "Enter your password",
+                        hint: "Password",
                         controller: passwordController,
                         isPassword: true,
                       ),
-
                       const SizedBox(height: 30),
-
+                      // Login Button
                       GestureDetector(
                         onTap: isLoading ? null : login,
                         child: Container(
@@ -207,73 +215,64 @@ class _LoginpageState extends State<Loginpage> {
                           ),
                           child: Center(
                             child: isLoading
-                                ? const CircularProgressIndicator(
-                                    color: Colors.white,
-                                  )
+                                ? const CircularProgressIndicator(color: Colors.white)
                                 : const Text(
-                                    "Login",
+                                    "LOGIN",
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
+                                      letterSpacing: 1,
                                     ),
                                   ),
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 20),
-
+                      const Text("OR", style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 20),
+                      // Google Login Button
                       GestureDetector(
-                        onTap: signInWithGoogle,
+                        onTap: isLoading ? null : signInWithGoogle,
                         child: Container(
                           width: double.infinity,
                           height: 55,
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            border: Border.all(color: Colors.grey),
+                            border: Border.all(color: Colors.grey.shade300),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Center(
-                            child: Text(
-                              "Continue with Google",
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.g_mobiledata, size: 30, color: Colors.blue),
+                              const Text(
+                                "Continue with Google",
+                                style: TextStyle(
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ),
                       ),
-
-                      const SizedBox(height: 20),
-                     
-
-                      const SizedBox(height: 20),
-
+                      const SizedBox(height: 25),
+                      // To Signup Page
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text(
-                            "Don't have an account? ",
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-
+                          const Text("Don't have an account? "),
                           GestureDetector(
                             onTap: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SignupPage(),
-                                ),
+                                MaterialPageRoute(builder: (_) => const SignupPage()),
                               );
                             },
                             child: const Text(
-                              "Sign up",
+                              "Sign Up",
                               style: TextStyle(
-                                color: Colors.blue,
+                                color: Color(0xFF5B86E5),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),

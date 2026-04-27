@@ -3,9 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:todo_app_new/UI/loginpage.dart';
 import 'package:todo_app_new/UI/todolist.dart';
 
-// import 'package:todo_app/UI/loginpage.dart';
-// import 'package:todo_app/UI/todolist.dart';
-//
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -58,7 +56,7 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // 🔥 LOGO (you can change image)
+          
             const Text("📝", style: TextStyle(fontSize: 90)),
             const SizedBox(height: 20),
 

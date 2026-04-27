@@ -1,7 +1,11 @@
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
+
+import 'package:image_picker/image_picker.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -23,21 +27,79 @@ class Todolist extends StatefulWidget {
 }
 
 class _TodolistState extends State<Todolist> {
-  List<String> lists = ["My Day", "Important", "Work", "Groceries"];
+  final db = FirebaseFirestore.instance;
+  String? _imageUrl;
 
-  Map<String, String> listEmojis = {
-    "My Day": "☀️",
-    "Important": "⭐",
-    "Work": "💼",
-    "Groceries": "🍉",
-  };
+  bool _isUploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  void _loadUserProfile() async {
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      var userDoc = await db.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        setState(() {
+          _imageUrl = userDoc.data()?['profilePic'];
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final ImagePicker picker = ImagePicker();
+
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      setState(() => _isUploading = true);
+
+      try {
+        String uid = FirebaseAuth.instance.currentUser!.uid;
+        Reference ref = FirebaseStorage.instance.ref().child(
+          'profile_pics/$uid',
+        );
+
+        Uint8List bytes = await image.readAsBytes();
+
+        await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+
+        String downloadUrl = await ref.getDownloadURL();
+
+        await FirebaseFirestore.instance.collection('users').doc(uid).set({
+          'profilePic': downloadUrl,
+        }, SetOptions(merge: true));
+
+        setState(() {
+          _imageUrl = downloadUrl;
+          _isUploading = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Profile Photo Updated ✅")),
+          );
+        }
+      } catch (e) {
+        setState(() => _isUploading = false);
+
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text("Error: $e")));
+        }
+      }
+    }
+  }
 
   void _openList(String title) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => ListScreen(title: title, listEmojis: listEmojis),
-      ),
+      MaterialPageRoute(builder: (context) => ListScreen(title: title)),
     );
   }
 
@@ -56,9 +118,9 @@ class _TodolistState extends State<Todolist> {
             "New List",
             style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold),
           ),
-          content: Container(
-            width: 300, // 🔥 increase width
-            height: 150, // 🔥 increase height
+          content: SizedBox(
+            width: 300,
+            height: 100,
             child: TextField(
               controller: controller,
               decoration: InputDecoration(
@@ -71,17 +133,21 @@ class _TodolistState extends State<Todolist> {
               ),
             ),
           ),
+
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text("Cancel"),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (controller.text.isNotEmpty) {
-                  setState(() {
-                    lists.add(controller.text);
-                    listEmojis[controller.text] = "📋";
+                  await db.collection('categories').add({
+                    'name': controller.text,
+                    'emoji': "📋",
+                    'userId':
+                        FirebaseAuth.instance.currentUser?.uid ?? "testUser",
+                    'createdAt': DateTime.now().millisecondsSinceEpoch,
                   });
                 }
                 Navigator.pop(context);
@@ -98,51 +164,131 @@ class _TodolistState extends State<Todolist> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("To Do App"),
+        title: const Text(
+          "To Do App",
+          style: TextStyle(color: Colors.white, fontSize: 20),
+        ),
         backgroundColor: Colors.teal,
-         actions: [
-    IconButton(
-      onPressed: () async {
-        await FirebaseAuth.instance.signOut();
-        if (mounted) {
-          // Navigate back to Loginpage (Ensure you import it)
-          Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-        }
-      },
-      icon: const Icon(Icons.logout),
-    ),
-  ],
+        actions: [
+          IconButton(
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (mounted) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/',
+                  (route) => false,
+                );
+              }
+            },
+            icon: const Icon(Icons.logout),
+          ),
+        ],
       ),
       drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
+        child: Column(
           children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.teal),
-              child: Text(
-                "My Lists",
-                style: TextStyle(color: Colors.white, fontSize: 20),
-              ),
-            ),
-            ...lists.map(
-              (list) => ListTile(
-                leading: Text(
-                  listEmojis[list] ?? "📋",
-                  style: const TextStyle(fontSize: 20),
+            UserAccountsDrawerHeader(
+              decoration: const BoxDecoration(color: Colors.teal),
+              currentAccountPicture: GestureDetector(
+                onTap: _isUploading ? null : _pickAndUploadImage,
+                child: CircleAvatar(
+                  backgroundColor: Colors.white,
+
+                  backgroundImage: _imageUrl != null
+                      ? NetworkImage(_imageUrl!)
+                      : null,
+                  child: (_imageUrl == null && !_isUploading)
+                      ? const Icon(Icons.person, size: 40, color: Colors.teal)
+                      : _isUploading
+                      ? const CircularProgressIndicator(color: Colors.teal)
+                      : null,
                 ),
-                title: Text(list),
-                onTap: () => _openList(list),
+              ),
+
+              accountName: const Text(
+                "My Lists",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+
+              accountEmail: Text(
+                FirebaseAuth.instance.currentUser?.email ?? "User Email",
+                style: const TextStyle(color: Colors.white70),
               ),
             ),
+
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: db
+                    .collection('categories')
+                    .orderBy('createdAt')
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData)
+                    return const Center(child: CircularProgressIndicator());
+
+                  return ListView(
+                    padding: EdgeInsets.zero,
+                    children: snapshot.data!.docs.map((doc) {
+                      String categoryName = doc['name'];
+
+                      return ListTile(
+                        leading: Text(
+                          doc['emoji'] ?? "📋",
+                          style: const TextStyle(fontSize: 20),
+                        ),
+                        title: Text(categoryName),
+
+                        trailing: StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('todo')
+                              .where('list', isEqualTo: categoryName)
+                              .where('isDone', isEqualTo: false)
+                              .snapshots(),
+                          builder: (context, taskSnapshot) {
+                            if (!taskSnapshot.hasData) return const SizedBox();
+
+                            int count = taskSnapshot.data!.docs.length;
+
+                            if (count == 0) return const SizedBox();
+
+                            return Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(
+                                color: Colors.teal,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '$count',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
+                        onTap: () => _openList(categoryName),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ),
+
             const Divider(),
             ListTile(
               leading: const Icon(Icons.add, color: Colors.teal),
               title: const Text("Add List"),
               onTap: _showAddListDialog,
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
+
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -167,9 +313,8 @@ class _TodolistState extends State<Todolist> {
 
 class ListScreen extends StatefulWidget {
   final String title;
-  final Map<String, String> listEmojis;
 
-  const ListScreen({super.key, required this.title, required this.listEmojis});
+  const ListScreen({super.key, required this.title});
 
   @override
   State<ListScreen> createState() => _ListScreenState();
@@ -177,29 +322,29 @@ class ListScreen extends StatefulWidget {
 
 class _ListScreenState extends State<ListScreen> {
   final db = FirebaseFirestore.instance;
+
   void _addTask(String title) async {
     try {
       await db.collection('todo').add({
         'title': title,
         'isDone': false,
         'list': widget.title,
-        'date': Timestamp.now(),
+        'date': FieldValue.serverTimestamp(),
         'userId': FirebaseAuth.instance.currentUser?.uid ?? "testUser",
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Task Added ✅")));
 
-      print("✅ Task Added");
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Task Added ✅")));
+      }
     } catch (e) {
       print("❌ Error: $e");
     }
   }
 
   void _toggleTask(String docId, bool currentValue) async {
-    await FirebaseFirestore.instance.collection('todo').doc(docId).update({
-      'isDone': !currentValue,
-    });
+    await db.collection('todo').doc(docId).update({'isDone': !currentValue});
   }
 
   void _showAddDialog() {
@@ -209,7 +354,7 @@ class _ListScreenState extends State<ListScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: Colors.transparent, // 🔥 important
+          backgroundColor: Colors.transparent,
           elevation: 0,
           content: Container(
             padding: const EdgeInsets.all(20),
@@ -221,7 +366,6 @@ class _ListScreenState extends State<ListScreen> {
               ),
               borderRadius: BorderRadius.circular(20),
             ),
-
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -233,9 +377,7 @@ class _ListScreenState extends State<ListScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
                 const SizedBox(height: 15),
-
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
@@ -250,9 +392,7 @@ class _ListScreenState extends State<ListScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -263,7 +403,6 @@ class _ListScreenState extends State<ListScreen> {
                         style: TextStyle(color: Colors.white70),
                       ),
                     ),
-
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
@@ -275,8 +414,8 @@ class _ListScreenState extends State<ListScreen> {
                       onPressed: () {
                         if (controller.text.isNotEmpty) {
                           _addTask(controller.text);
+                          Navigator.pop(context);
                         }
-                        Navigator.pop(context);
                       },
                       child: const Text("Add"),
                     ),
@@ -294,112 +433,49 @@ class _ListScreenState extends State<ListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("${widget.listEmojis[widget.title]} ${widget.title}"),
+        title: Text(widget.title, style: const TextStyle(color: Colors.white)),
         backgroundColor: Colors.teal,
-      ),
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: Colors.teal.shade50,
-        child: StreamBuilder(
-          stream: db
-              .collection('todo')
-              .where('list', isEqualTo: widget.title)
-              .where(
-                'userId',
-                isEqualTo: FirebaseAuth.instance.currentUser!.uid,
-              )
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            var docs = snapshot.data!.docs;
-
-            if (docs.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      widget.listEmojis[widget.title] ?? "📝",
-                      style: const TextStyle(fontSize: 80),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text("Start your tasks"),
-                  ],
-                ),
-              );
-            }
-
-            return ListView.builder(
-              itemCount: docs.length,
-              itemBuilder: (context, index) {
-                var doc = docs[index];
-                var data = doc.data() as Map<String, dynamic>;
-                print(data['title']);
-
-                return Dismissible(
-                  key: Key(doc.id),
-                  onDismissed: (_) async {
-                    await db.collection('todo').doc(doc.id).delete();
-                  },
-                  background: Container(color: Colors.red),
-                  child: ListTile(
-                    leading: Checkbox(
-                      value: data['isDone'] ?? false,
-                      onChanged: (value) {
-                        _toggleTask(doc.id, data['isDone'] ?? false);
-                      },
-                    ),
-                    title: Text(data['title'] ?? ''),
-                    subtitle: Row(
-                      children: [
-                        const Icon(
-                          Icons.calendar_today,
-                          size: 14,
-                          color: Colors.orange,
-                        ),
-                        const SizedBox(width: 6),
-
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Colors.teal, Colors.blue],
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            data['date'] != null
-                                ? DateFormat(
-                                    'dd MMM, hh:mm a',
-                                  ).format((data['date'] as Timestamp).toDate())
-                                : '',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        ),
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.teal,
         onPressed: _showAddDialog,
-        child: const Icon(Icons.add),
+        backgroundColor: Colors.teal,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: db
+            .collection('todo')
+            .where('list', isEqualTo: widget.title)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text("No tasks yet"));
+          }
+
+          return ListView(
+            children: snapshot.data!.docs.map((doc) {
+              bool isDone = doc['isDone'] ?? false;
+              return ListTile(
+                leading: Checkbox(
+                  value: isDone,
+                  onChanged: (val) => _toggleTask(doc.id, isDone),
+                ),
+                title: Text(
+                  doc['title'],
+                  style: TextStyle(
+                    decoration: isDone ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                  onPressed: () => db.collection('todo').doc(doc.id).delete(),
+                ),
+              );
+            }).toList(),
+          );
+        },
       ),
     );
   }

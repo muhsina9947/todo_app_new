@@ -21,25 +21,13 @@ class DefaultFirebaseOptions {
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for android - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -61,4 +49,45 @@ class DefaultFirebaseOptions {
     storageBucket: 'todo-app-83c47.firebasestorage.app',
     measurementId: 'G-K4SBF62TWS',
   );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyATndy_ufQ-KDw_ltp8P0v5actwgB6s23g',
+    appId: '1:5104099623:ios:3f1daea3d302da70300902',
+    messagingSenderId: '5104099623',
+    projectId: 'todo-app-83c47',
+    storageBucket: 'todo-app-83c47.firebasestorage.app',
+    androidClientId: '5104099623-7u1hh0au64loufmoat9n089o6sko7111.apps.googleusercontent.com',
+    iosClientId: '5104099623-tjfnvimd0qaf38lnjmltlevoagm5dcl2.apps.googleusercontent.com',
+    iosBundleId: 'com.example.todoAppNew',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyATndy_ufQ-KDw_ltp8P0v5actwgB6s23g',
+    appId: '1:5104099623:ios:3f1daea3d302da70300902',
+    messagingSenderId: '5104099623',
+    projectId: 'todo-app-83c47',
+    storageBucket: 'todo-app-83c47.firebasestorage.app',
+    androidClientId: '5104099623-7u1hh0au64loufmoat9n089o6sko7111.apps.googleusercontent.com',
+    iosClientId: '5104099623-tjfnvimd0qaf38lnjmltlevoagm5dcl2.apps.googleusercontent.com',
+    iosBundleId: 'com.example.todoAppNew',
+  );
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyCayq1WrKhD8Of0BDbhSvJ1z8W52Dij-i0',
+    appId: '1:5104099623:android:ace5a8a5296a8e08300902',
+    messagingSenderId: '5104099623',
+    projectId: 'todo-app-83c47',
+    storageBucket: 'todo-app-83c47.firebasestorage.app',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyASj08Eys9WGZwvFwKmDUECrw4zFg1om18',
+    appId: '1:5104099623:web:d02ba1251a97c2c4300902',
+    messagingSenderId: '5104099623',
+    projectId: 'todo-app-83c47',
+    authDomain: 'todo-app-83c47.firebaseapp.com',
+    storageBucket: 'todo-app-83c47.firebasestorage.app',
+    measurementId: 'G-M82DHMQ4CP',
+  );
+
 }

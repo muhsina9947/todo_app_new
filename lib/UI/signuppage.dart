@@ -1,9 +1,7 @@
-// import 'package:api_text4/UI/translatorscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-// import 'package:todo_app/UI/todolist.dart';
+import 'package:google_sign_in/google_sign_in.dart'; 
 import 'package:todo_app_new/UI/todolist.dart';
-// import 'package:google_sign_in/google_sign_in.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -19,11 +17,28 @@ class _SignupPageState extends State<SignupPage> {
   bool isPasswordVisible = false;
   bool isLoading = false;
 
+  final GoogleSignIn googleSignIn = GoogleSignIn();
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  void goToHome() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const Todolist()),
+    );
+  }
+
+  
   Future<void> signUp() async {
     if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Fill all fields")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Fill all fields")),
+      );
       return;
     }
 
@@ -42,19 +57,9 @@ class _SignupPageState extends State<SignupPage> {
         password: passwordController.text.trim(),
       );
 
-      emailController.clear();
-      passwordController.clear();
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Signup Success")));
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const Todolist()),
-      );
+      goToHome();
     } on FirebaseAuthException catch (e) {
-      String msg = "Error";
+      String msg = "Signup failed";
 
       if (e.code == 'email-already-in-use') {
         msg = "Email already used";
@@ -64,27 +69,51 @@ class _SignupPageState extends State<SignupPage> {
         msg = "Weak password";
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      setState(() => isLoading = false);
     }
-
-    setState(() => isLoading = false);
   }
 
+  
   Future<void> signInWithGoogle() async {
+    setState(() => isLoading = true);
+
     try {
-      GoogleAuthProvider authProvider = GoogleAuthProvider();
+      await googleSignIn.signOut(); // optional
 
-      await FirebaseAuth.instance.signInWithPopup(authProvider);
+      final GoogleSignInAccount? googleUser =
+          await googleSignIn.signIn();
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const Todolist()),
+      if (googleUser == null) {
+        setState(() => isLoading = false);
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
       );
+
+      await FirebaseAuth.instance.signInWithCredential(credential);
+
+      goToHome();
     } catch (e) {
-      print("Error: $e");
+      print("GOOGLE SIGNUP ERROR: $e");
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Google Sign-In Failed")),
+      );
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
+  
   Widget buildTextField({
     required IconData icon,
     required String hint,
@@ -100,30 +129,28 @@ class _SignupPageState extends State<SignupPage> {
       child: Row(
         children: [
           Icon(icon, color: Colors.black),
-
           const SizedBox(width: 10),
-
           Expanded(
             child: TextField(
               controller: controller,
-              style: const TextStyle(color: Colors.black), // ✅ typing black
               obscureText: isPassword ? !isPasswordVisible : false,
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: const TextStyle(color: Colors.black), // ✅ hint black
                 border: InputBorder.none,
               ),
             ),
           ),
-
           if (isPassword)
             IconButton(
               icon: Icon(
-                isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                color: Colors.black,
+                isPasswordVisible
+                    ? Icons.visibility
+                    : Icons.visibility_off,
               ),
               onPressed: () {
-                setState(() => isPasswordVisible = !isPasswordVisible);
+                setState(() {
+                  isPasswordVisible = !isPasswordVisible;
+                });
               },
             ),
         ],
@@ -131,37 +158,24 @@ class _SignupPageState extends State<SignupPage> {
     );
   }
 
-  @override
-  void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
-    super.dispose();
-  }
-
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFF36D1DC), Color(0xFF5B86E5)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
           ),
         ),
-
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(25),
-
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 60),
-
                 const Text(
                   "Sign up Now",
                   style: TextStyle(
@@ -170,7 +184,6 @@ class _SignupPageState extends State<SignupPage> {
                     color: Colors.white,
                   ),
                 ),
-
                 const SizedBox(height: 40),
 
                 Container(
@@ -179,111 +192,54 @@ class _SignupPageState extends State<SignupPage> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                   ),
-
                   child: Column(
                     children: [
                       buildTextField(
                         icon: Icons.email,
-                        hint: "Enter your email",
+                        hint: "Email",
                         controller: emailController,
                       ),
-
                       const SizedBox(height: 20),
-
                       buildTextField(
                         icon: Icons.lock,
-                        hint: "Enter your password",
+                        hint: "Password",
                         controller: passwordController,
                         isPassword: true,
                       ),
-
                       const SizedBox(height: 30),
 
-                      GestureDetector(
-                        onTap: isLoading ? null : signUp,
-                        child: Container(
-                          height: 50,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF36D1DC), Color(0xFF5B86E5)],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Center(
-                            child: isLoading
-                                ? const CircularProgressIndicator(
-                                    color: Colors.white,
-                                  )
-                                : const Text(
-                                    "Sign Up",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                          ),
+                      // 🔹 Signup button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: isLoading ? null : signUp,
+                          child: isLoading
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white)
+                              : const Text("Sign Up"),
                         ),
                       ),
 
                       const SizedBox(height: 20),
 
-                      Row(
-                        children: [
-                          Expanded(child: Divider(color: Colors.black)),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 10),
-                            child: Text(
-                              "OR",
-                              style: TextStyle(
-                                color: Colors.black, // ✅ BLACK
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          Expanded(child: Divider(color: Colors.black)),
-                        ],
-                      ),
+                      const Text("OR"),
 
                       const SizedBox(height: 20),
 
-                      GestureDetector(
-                        onTap: signInWithGoogle,
-                        child: Container(
-                          height: 55,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: Colors.grey),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.g_mobiledata,
-                                color: Colors.red,
-                                size: 24,
-                              ),
-
-                              const SizedBox(width: 10),
-
-                              const Text(
-                                "Continue with Google",
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
+                     
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed:
+                              isLoading ? null : signInWithGoogle,
+                          icon: const Icon(Icons.g_mobiledata, size: 30),
+                          label:
+                              const Text("Continue with Google"),
                         ),
                       ),
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 30),
               ],
             ),
           ),
